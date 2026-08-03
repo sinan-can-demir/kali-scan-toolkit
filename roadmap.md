@@ -42,7 +42,7 @@ Goal: turn the base image into a usable toolkit — repeatable scripts plus pers
 ### Epic: Scripting Layer
 - [x] `scripts/scan-subnet.sh` — host discovery (`nmap -sn`)
 - [x] `scripts/quick-recon.sh` — port + service scan on a given host (`nmap -sV -T4 -sC -Pn`; required-target validation instead of a default, since a single host has no sane fallback)
-- [ ] `scripts/arp-sweep.sh` — ARP-based discovery (host networking only)
+- [x] `scripts/arp-sweep.sh` — ARP-based discovery (host networking only; `arp-scan`, optional target defaulting to `--localnet`, output redirected via `bash -c` since `arp-scan` has no native `-oN`-style flag)
 - [x] Standardize output: timestamped filenames, saved to `data/`
   - Convention landed in `scan-subnet.sh`: `scan_<TS>_<sanitized-target>.txt`, written via `nmap -oN` into a `-v ~/kali-data:/root/data:z` mount. On SELinux hosts (Fedora et al.) the mount needs the `:z` label or writes fail with `Permission denied` — harmless no-op on non-SELinux systems, so keep it in every script.
 - [x] Add a simple `--help` / usage message to each script (flesh out the placeholder text as scripts are written)
