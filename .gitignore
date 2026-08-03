@@ -1,0 +1,17 @@
+# Secrets
+.env
+
+# Scan output / captures — never committed
+data/
+*.pcap
+*.pcapng
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp

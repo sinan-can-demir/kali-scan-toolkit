@@ -1,0 +1,27 @@
+# Secrets — never bake into the image
+.env
+
+# Scan output / captures — host-only data, mounted as a volume
+data/
+*.pcap
+*.pcapng
+*.log
+
+# Git
+.git/
+.gitignore
+
+# Docs — not needed inside the image
+README.md
+SCOPE.md
+LICENSE
+roadmap.md
+*.md
+
+# CI
+.github/
+
+# OS / editors
+.DS_Store
+.vscode/
+.idea/
