@@ -28,7 +28,8 @@ Goal: get the repo skeleton, authorization posture, and a reproducible base imag
 - [x] Write `Dockerfile` based on `kalilinux/kali-rolling`
 - [x] Pin base image to a specific tag/digest (avoid silent drift)
 - [x] Install core tools: `nmap`, `netdiscover`, `arp-scan`, `tshark`
-- [ ] Decide on the Wireshark non-root capture group setting (bake the `yes`/`no` choice into the Dockerfile non-interactively via `debconf-set-selections`)
+- [x] Decide on the Wireshark non-root capture group setting
+  - Decision: leave it closed (default), no `debconf-set-selections` needed. The container always runs as root, so the non-root-capture mechanism (wireshark group + capabilities on `dumpcap`) has nothing to grant privilege to — enabling it would just add an unused capability-widening path. Revisit only if a non-root `USER` is ever introduced.
 - [x] Build and test locally: `docker build -t kali-scan-tools .`
 - [x] Confirm `--network host` scanning works as expected on your host
   - Note: this daemon doesn't grant `nmap` raw-socket access by default — containers must be run with `--cap-add=NET_RAW --cap-add=NET_ADMIN`. Bake this into Epoch 2's scripts and document it in the README.
@@ -39,12 +40,14 @@ Goal: get the repo skeleton, authorization posture, and a reproducible base imag
 Goal: turn the base image into a usable toolkit — repeatable scripts plus persistent, well-organized output.
 
 ### Epic: Scripting Layer
-- [ ] `scripts/scan-subnet.sh` — host discovery (`nmap -sn`)
+- [x] `scripts/scan-subnet.sh` — host discovery (`nmap -sn`)
 - [ ] `scripts/quick-recon.sh` — port + service scan on a given host
 - [ ] `scripts/arp-sweep.sh` — ARP-based discovery (host networking only)
-- [ ] Standardize output: timestamped filenames, saved to `data/`
-- [ ] Add a simple `--help` / usage message to each script
-- [ ] Parameterize target subnet (no hardcoded IPs) via CLI arg or `.env`
+- [x] Standardize output: timestamped filenames, saved to `data/`
+  - Convention landed in `scan-subnet.sh`: `scan_<TS>_<sanitized-target>.txt`, written via `nmap -oN` into a `-v ~/kali-data:/root/data:z` mount. On SELinux hosts (Fedora et al.) the mount needs the `:z` label or writes fail with `Permission denied` — harmless no-op on non-SELinux systems, so keep it in every script.
+- [x] Add a simple `--help` / usage message to each script (flesh out the placeholder text as scripts are written)
+- [x] Parameterize target subnet (no hardcoded IPs) via CLI arg or `.env`
+  - Pattern: `TARGET="${1:-192.168.1.0/24}"` — CLI arg with a sane default
 
 ### Epic: Data & Persistence
 - [ ] Standardize volume mount: `-v ~/kali-data:/root/data`
