@@ -41,7 +41,7 @@ Goal: turn the base image into a usable toolkit — repeatable scripts plus pers
 
 ### Epic: Scripting Layer
 - [x] `scripts/scan-subnet.sh` — host discovery (`nmap -sn`)
-- [ ] `scripts/quick-recon.sh` — port + service scan on a given host
+- [x] `scripts/quick-recon.sh` — port + service scan on a given host (`nmap -sV -T4 -sC -Pn`; required-target validation instead of a default, since a single host has no sane fallback)
 - [ ] `scripts/arp-sweep.sh` — ARP-based discovery (host networking only)
 - [x] Standardize output: timestamped filenames, saved to `data/`
   - Convention landed in `scan-subnet.sh`: `scan_<TS>_<sanitized-target>.txt`, written via `nmap -oN` into a `-v ~/kali-data:/root/data:z` mount. On SELinux hosts (Fedora et al.) the mount needs the `:z` label or writes fail with `Permission denied` — harmless no-op on non-SELinux systems, so keep it in every script.
@@ -50,8 +50,8 @@ Goal: turn the base image into a usable toolkit — repeatable scripts plus pers
   - Pattern: `TARGET="${1:-192.168.1.0/24}"` — CLI arg with a sane default
 
 ### Epic: Data & Persistence
-- [ ] Standardize volume mount: `-v ~/kali-data:/root/data`
-- [ ] Decide naming convention for scan output (e.g. `scan_YYYYMMDD_HHMM_target.txt`)
+- [x] Standardize volume mount: `-v ~/kali-data:/root/data:z` (both scripts share this; `:z` label required on SELinux hosts)
+- [x] Decide naming convention for scan output: `scan_<timestamp>_<sanitized-target>.txt`, e.g. `scan_20260803_060700_192.168.1.254.txt`
 - [ ] Optional: script to summarize/diff scans over time (what changed on the network since last scan)
 - [ ] Document how to clean up old scan data safely
 
