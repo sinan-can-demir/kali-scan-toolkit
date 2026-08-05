@@ -1,0 +1,8 @@
+# Build context is scan-tools/ only — root-level docs, data/, .git, etc.
+# live outside this context already and don't need excluding here.
+
+# OS / editors
+.DS_Store
+.vscode/
+.idea/
+*.swp

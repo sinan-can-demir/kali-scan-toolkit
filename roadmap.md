@@ -13,14 +13,20 @@ Goal: get the repo skeleton, authorization posture, and a reproducible base imag
 - [x] Add `SCOPE.md` — explicit statement of authorized use (your own network/devices only)
 - [x] Add `LICENSE` (MIT/Apache 2.0)
 - [x] Add `.gitignore` / `.dockerignore` (exclude scan results, pcaps, logs, `.env`)
-- [x] Set up basic folder structure:
+- [x] Set up basic folder structure
+  - Restructured in Epoch 4 planning: each tool family gets its own subdirectory (Dockerfile + scripts together), rather than one flat root. Motivation: `scan-tools` (one-shot CLI scripts) and `defense/suricata` (a long-running daemon, different config needs) are different *kinds* of things and shouldn't share a build context. `data/` stays shared at the root since output is common across tools.
   ```
-  kali-scan-tools/
-  ├── Dockerfile
+  kali_docker_setup/
+  ├── scan-tools/
+  │   ├── Dockerfile
+  │   ├── .dockerignore
+  │   └── scripts/
+  ├── defense/
+  │   └── suricata/      (added when Epoch 4 build work starts)
   ├── README.md
   ├── SCOPE.md
-  ├── scripts/
-  ├── data/        (gitignored)
+  ├── roadmap.md
+  ├── data/               (gitignored, shared across tools)
   └── .github/workflows/
   ```
 
@@ -30,7 +36,7 @@ Goal: get the repo skeleton, authorization posture, and a reproducible base imag
 - [x] Install core tools: `nmap`, `netdiscover`, `arp-scan`, `tshark`
 - [x] Decide on the Wireshark non-root capture group setting
   - Decision: leave it closed (default), no `debconf-set-selections` needed. The container always runs as root, so the non-root-capture mechanism (wireshark group + capabilities on `dumpcap`) has nothing to grant privilege to — enabling it would just add an unused capability-widening path. Revisit only if a non-root `USER` is ever introduced.
-- [x] Build and test locally: `docker build -t kali-scan-tools .`
+- [x] Build and test locally: `docker build -t kali-scan-tools scan-tools/` (path updated after the Epoch 4 subdirectory restructure — was `.` when the Dockerfile lived at repo root)
 - [x] Confirm `--network host` scanning works as expected on your host
   - Note: this daemon doesn't grant `nmap` raw-socket access by default — containers must be run with `--cap-add=NET_RAW --cap-add=NET_ADMIN`. Bake this into Epoch 2's scripts and document it in the README.
 
@@ -53,7 +59,8 @@ Goal: turn the base image into a usable toolkit — repeatable scripts plus pers
 - [x] Standardize volume mount: `-v ~/kali-data:/root/data:z` (both scripts share this; `:z` label required on SELinux hosts)
 - [x] Decide naming convention for scan output: `scan_<timestamp>_<sanitized-target>.txt`, e.g. `scan_20260803_060700_192.168.1.254.txt`
 - [ ] Optional: script to summarize/diff scans over time (what changed on the network since last scan)
-- [ ] Document how to clean up old scan data safely
+- [x] Document how to clean up old scan data safely
+  - Went beyond docs: `scripts/clean-up.sh` — wipes `~/kali-data/`, gated behind a `[y/N]` confirmation prompt, reports success/failure based on `rm`'s actual exit code rather than assuming it worked
 
 ---
 
@@ -76,11 +83,33 @@ Opportunistic — pull items into scope only when there's a concrete need, not o
 
 ---
 
+## Epoch 4 — Defense Layer
+Goal: add passive network intrusion detection alongside the existing active-scanning toolkit — watch traffic instead of just probing it.
+
+### Epic: Network Intrusion Detection (Suricata)
+Suricata over Snort: actively maintained, available directly in Kali's repos, supports the free Emerging Threats Open ruleset, and its `eve.json` alert log is JSON — much easier to script against than older text log formats.
+
+- [x] Decide: separate image from `kali-scan-tools`, in its own `defense/suricata/` subdirectory (repo restructured for this — see Epoch 1's folder structure note)
+- [ ] **Decide the container lifecycle model**: everything built in Epoch 2 is ephemeral (`docker run --rm`, scan, exit). An IDS needs to run continuously in the background instead — this is a new pattern (detached/long-running containers) to learn before writing any scripts here
+- [ ] Configure Suricata to monitor the host's live interface (`--network host`, same requirement as the scanning scripts, but now for a sustained process instead of a one-shot run)
+- [ ] Pull in the Emerging Threats Open ruleset (free community detection rules)
+- [ ] Decide where alerts get written/persisted — likely `eve.json` into the existing `~/kali-data` mount, but as an append-only ongoing log rather than one file per run (different shape from the Epoch 2 output convention)
+- [ ] Write a wrapper script to start/stop/check status of the IDS container (start/stop is a new kind of script — not "run once," but "manage a running thing")
+- [ ] Document how to view/tail live alerts
+
+### Epic: Future Defensive Capabilities (Backlog)
+Ideas, not yet designed — promote one to a full epic (like Suricata above) only once you're ready to actually scope it. Not adding full checklists for these prematurely; each has real architecture questions of its own to work through first.
+- [ ] Host/log monitoring (`fail2ban`, `auditd`) — reacts to suspicious local activity like repeated failed logins; likely the next one worth promoting, since it directly covers unauthorized-access attempts regardless of what's behind them
+- [ ] Vulnerability/hardening audits (`Lynis`, `rkhunter`) — scans a system's own config for weaknesses, closer in spirit to the existing recon scripts (one-shot, not a daemon)
+- [ ] Malware scanning (`ClamAV`) — on-demand scanning of files/downloads for known malware signatures
+
+---
+
 ## Guiding Principles Throughout
 - **Reproducible over convenient** — prefer Dockerfile changes over manual `apt install` inside a running container.
 - **Data stays out of git** — scan results, pcaps, and logs live in a gitignored volume, not the repo.
 - **Scope stays explicit** — every script and the README reinforce "your own network only."
-- **Small and auditable** — resist scope creep; add tools only when you have a concrete need.
+- **Small and auditable** — resist scope creep; add tools only when you have a concrete need. Extends to structure, not just features: each tool family gets its own subdirectory with its own Dockerfile, so a different kind of tool (a daemon vs. a one-shot script) never has to share a build context with something it has nothing in common with.
 
 ---
 
@@ -90,3 +119,4 @@ Opportunistic — pull items into scope only when there's a concrete need, not o
 | Epoch 1 — Foundation | Repo scaffolded, authorization docs in place, Dockerfile builds and runs core tools with `--network host` |
 | Epoch 2 — Build-Out | Working scan scripts with standardized `--help`/params, persistent volume flow with a clear naming convention |
 | Epoch 3 — Maturity | CI building the image on every push, polished README, first tagged release (`v0.1`) |
+| Epoch 4 — Defense Layer | Suricata running as a long-lived container, watching live traffic, alerts viewable via a wrapper script |
