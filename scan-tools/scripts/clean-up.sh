@@ -5,7 +5,7 @@ if [[ "$1" == "-h" || "$1" == "--help" ]]; then
     exit 0
 fi
 
-read -p "Delete all files in ~/kali-data? [y/N] " CONFIRM
+read -rp "Delete all files in ~/kali-data? [y/N] " CONFIRM
 if [[ "$CONFIRM" != "y" ]]; then
     echo "Aborted"
     exit 0
