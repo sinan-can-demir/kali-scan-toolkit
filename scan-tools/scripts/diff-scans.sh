@@ -1,0 +1,31 @@
+#!/bin/bash
+
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    echo "Usage: ..."
+    exit 0
+fi
+
+# sort and select the most recent files
+FILES=($(ls -t ~/kali-data/scan_*--localnet.txt | head -2))
+
+if [[ ${#FILES[@]} -eq 0 ]]; then
+    echo "no files found"
+    exit 1
+fi
+
+NEWER="${FILES[0]}"
+OLDER="${FILES[1]}"
+
+if [[ -z "$OLDER" ]]; then
+    echo "Only one scan found — nothing to compare against yet."
+    exit 0
+fi
+
+echo "New hosts since last scan:"
+comm -13 <(grep -oE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' "$OLDER" | sort) \
+         <(grep -oE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' "$NEWER" | sort)
+
+echo ""
+echo "Hosts no longer seen:"
+comm -23 <(grep -oE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' "$OLDER" | sort) \
+         <(grep -oE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' "$NEWER" | sort)

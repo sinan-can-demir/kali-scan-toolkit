@@ -58,7 +58,8 @@ Goal: turn the base image into a usable toolkit — repeatable scripts plus pers
 ### Epic: Data & Persistence
 - [x] Standardize volume mount: `-v ~/kali-data:/root/data:z` (both scripts share this; `:z` label required on SELinux hosts)
 - [x] Decide naming convention for scan output: `scan_<timestamp>_<sanitized-target>.txt`, e.g. `scan_20260803_060700_192.168.1.254.txt`
-- [ ] Optional: script to summarize/diff scans over time (what changed on the network since last scan)
+- [x] Optional: script to summarize/diff scans over time (what changed on the network since last scan)
+  - `scripts/diff-scans.sh` — compares the two most recent `arp-sweep.sh --localnet` outputs (chosen over `scan-subnet.sh`: `arp-scan`'s output is simpler to parse and more reliable, since every device must answer ARP to function on the network at all). Extracts IPs via `grep -oE`, diffs sorted lists with `comm -13`/`comm -23` (new vs. gone), fed via process substitution. Handles zero-scans and single-scan-only edge cases explicitly.
 - [x] Document how to clean up old scan data safely
   - Went beyond docs: `scripts/clean-up.sh` — wipes `~/kali-data/`, gated behind a `[y/N]` confirmation prompt, reports success/failure based on `rm`'s actual exit code rather than assuming it worked
 
