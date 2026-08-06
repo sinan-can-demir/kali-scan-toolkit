@@ -72,8 +72,9 @@ Goal: make the repo maintainable and polished, then layer on optional capabiliti
 - [x] Optional: lint shell scripts with `shellcheck` in CI
 - [x] Require `build` and `tests` checks to pass before merging to `main` (branch protection)
   - Configured via `gh api`: required status checks (`build`, `tests`, strict mode), 1 required PR review, `enforce_admins: false` so the repo owner can still override/merge directly when needed. Normal flow is now branch → PR → CI → merge instead of direct pushes to `main`.
-- [ ] Add versioned releases/tags as the toolkit stabilizes (`v0.1`, `v0.2`, …)
-- [ ] Expand `README.md` with usage examples and sample output
+- [x] Add versioned releases/tags as the toolkit stabilizes (`v0.1`, `v0.2`, …)
+- [x] Expand `README.md` with usage examples and sample output
+  - Uses generic/placeholder IPs and output rather than real scan results, since the repo is public — no reason to publish specifics about the home network used for testing
 
 ### Epic: Nice-to-Haves / Backlog
 Opportunistic — pull items into scope only when there's a concrete need, not on a schedule.
