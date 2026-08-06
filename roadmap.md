@@ -68,8 +68,10 @@ Goal: turn the base image into a usable toolkit — repeatable scripts plus pers
 Goal: make the repo maintainable and polished, then layer on optional capabilities as real needs arise.
 
 ### Epic: Automation & Quality
-- [ ] GitHub Action: build the Docker image on every push, catch breakage early
-- [ ] Optional: lint shell scripts with `shellcheck` in CI
+- [x] GitHub Action: build the Docker image on every push, catch breakage early
+- [x] Optional: lint shell scripts with `shellcheck` in CI
+- [x] Require `build` and `tests` checks to pass before merging to `main` (branch protection)
+  - Configured via `gh api`: required status checks (`build`, `tests`, strict mode), 1 required PR review, `enforce_admins: false` so the repo owner can still override/merge directly when needed. Normal flow is now branch → PR → CI → merge instead of direct pushes to `main`.
 - [ ] Add versioned releases/tags as the toolkit stabilizes (`v0.1`, `v0.2`, …)
 - [ ] Expand `README.md` with usage examples and sample output
 
