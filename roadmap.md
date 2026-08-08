@@ -94,8 +94,10 @@ Goal: add passive network intrusion detection alongside the existing active-scan
 Suricata over Snort: actively maintained, available directly in Kali's repos, supports the free Emerging Threats Open ruleset, and its `eve.json` alert log is JSON — much easier to script against than older text log formats.
 
 - [x] Decide: separate image from `kali-scan-tools`, in its own `defense/suricata/` subdirectory (repo restructured for this — see Epoch 1's folder structure note)
-- [ ] **Decide the container lifecycle model**: everything built in Epoch 2 is ephemeral (`docker run --rm`, scan, exit). An IDS needs to run continuously in the background instead — this is a new pattern (detached/long-running containers) to learn before writing any scripts here
-- [ ] Configure Suricata to monitor the host's live interface (`--network host`, same requirement as the scanning scripts, but now for a sustained process instead of a one-shot run)
+- [x] **Decide the container lifecycle model**: `docker run -d` (detached) instead of `--rm`, named container (`--name suricata-ids`) so it can be managed after the fact via `docker logs`/`stop`/`start`. `--restart unless-stopped` planned for the wrapper script, so monitoring survives crashes/reboots without silently staying down.
+- [x] Configure Suricata to monitor the host's live interface (`--network host`, same as the scanning scripts) — tested against the real interface (`wlp0s20f3`)
+  - Same capability gotcha as `nmap`/`arp-scan`, different symptom: without `--cap-add=NET_RAW --cap-add=NET_ADMIN`, Suricata starts but spams `ioctl: ... Operation not permitted` (it can't configure NIC offload settings via `SIOCETHTOOL`). Confirmed fixed by adding both flags — warnings disappeared entirely on retest.
+  - Interface name is **not** hardcoded into the Dockerfile/image — `CMD` in the Dockerfile is just a fallback; the real value gets supplied at `docker run` time (fully overrides `CMD`) via the upcoming wrapper script, same `${1:-default}` pattern as the other scripts. Keeps the image portable across machines/interfaces.
 - [ ] Pull in the Emerging Threats Open ruleset (free community detection rules)
 - [ ] Decide where alerts get written/persisted — likely `eve.json` into the existing `~/kali-data` mount, but as an append-only ongoing log rather than one file per run (different shape from the Epoch 2 output convention)
 - [ ] Write a wrapper script to start/stop/check status of the IDS container (start/stop is a new kind of script — not "run once," but "manage a running thing")
