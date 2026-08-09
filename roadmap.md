@@ -110,9 +110,22 @@ Suricata over Snort: actively maintained, available directly in Kali's repos, su
 
 ### Epic: Future Defensive Capabilities (Backlog)
 Ideas, not yet designed — promote one to a full epic (like Suricata above) only once you're ready to actually scope it. Not adding full checklists for these prematurely; each has real architecture questions of its own to work through first.
-- [ ] Host/log monitoring (`fail2ban`, `auditd`) — reacts to suspicious local activity like repeated failed logins; likely the next one worth promoting, since it directly covers unauthorized-access attempts regardless of what's behind them
 - [ ] Vulnerability/hardening audits (`Lynis`, `rkhunter`) — scans a system's own config for weaknesses, closer in spirit to the existing recon scripts (one-shot, not a daemon)
 - [ ] Malware scanning (`ClamAV`) — on-demand scanning of files/downloads for known malware signatures
+- [ ] `auditd` — deliberately **not** containerized if pursued. It hooks into the Linux kernel's audit subsystem via netlink, a single system-wide resource, not something namespaced per-container the way network interfaces are — containerizing it fights the tool rather than using it well. If ever pursued: install directly on the host, outside this project's container-everything pattern. Deferred indefinitely, not a rejection — revisit anytime.
+
+---
+
+## Epoch 5 — Host Defense (fail2ban)
+Goal: extend defense-in-depth to the host itself — react to suspicious local activity (repeated failed logins, etc.), complementing Suricata's network-level detection with host-level response.
+
+### Epic: Host Intrusion Prevention (fail2ban)
+- [ ] **Confirm there's an actual target before building around one**: identify which auth-facing services (SSH, etc.) are actually running/exposed on this host. `fail2ban` watches logs from services facing login attempts — no exposed service means nothing meaningful for it to protect.
+- [ ] Decide: separate image in `defense/fail2ban/`, same per-tool-family subdirectory pattern as `scan-tools/` and `defense/suricata/`
+- [ ] **Test empirically, don't assume**: can a containerized `fail2ban` actually write firewall rules that take effect against the host (`--network host` + capabilities)? This is the load-bearing assumption for the whole epic — validate it early, the same way the Suricata capability requirement was confirmed by testing before/after `--cap-add`, not assumed from docs.
+- [ ] Configure `fail2ban` to watch the confirmed real log source(s) from the item above
+- [ ] Decide how to view what's been banned (parallel to Suricata's `logs` subcommand)
+- [ ] Wrapper script (start/stop/status, extending the same `case`-statement pattern from `suricata-ctl.sh`)
 
 ---
 
@@ -131,3 +144,4 @@ Ideas, not yet designed — promote one to a full epic (like Suricata above) onl
 | Epoch 2 — Build-Out | Working scan scripts with standardized `--help`/params, persistent volume flow with a clear naming convention |
 | Epoch 3 — Maturity | CI building the image on every push, polished README, first tagged release (`v0.1`) |
 | Epoch 4 — Defense Layer | Suricata running as a long-lived container, watching live traffic, alerts viewable via a wrapper script |
+| Epoch 5 — Host Defense | `fail2ban` confirmed to actually ban IPs from a container against a real, confirmed log source; wrapper script parallel to `suricata-ctl.sh` |
