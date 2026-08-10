@@ -77,6 +77,11 @@ Goal: make the repo maintainable and polished, then layer on optional capabiliti
 - [x] Expand `README.md` with usage examples and sample output
   - Uses generic/placeholder IPs and output rather than real scan results, since the repo is public — no reason to publish specifics about the home network used for testing
 
+### Epic: Supply Chain Security (Image Scanning)
+Different goal from the Lynis/rkhunter idea it grew out of — not auditing the host machine (a container can't meaningfully do that, same reasoning as `auditd`), but auditing the Docker images this project actually builds and ships: are `kali-scan-tools` and `suricata-ids` free of known-vulnerable packages?
+- [ ] New `scan` job in `ci.yml`, using `aquasecurity/trivy-action` against both built images, filtered to `CRITICAL,HIGH` to avoid low-severity noise
+- [ ] Deliberately **non-blocking** for now (`exit-code: 0`) — a scan job that fails the build over a CVE in an unrelated base-image package (discovered after the fact, not caused by any code change) would create surprise failures on trivial PRs. Report first, decide later — once there's a sense of what it actually flags in practice — whether to promote `scan` to a required branch-protection check.
+
 ### Epic: Nice-to-Haves / Backlog
 Opportunistic — pull items into scope only when there's a concrete need, not on a schedule.
 - [ ] Add optional tools as needed: `masscan`, `nikto`, `hydra` (only if you have a real use case — avoid bloat)
