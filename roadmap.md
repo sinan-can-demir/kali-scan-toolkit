@@ -124,13 +124,30 @@ Ideas, not yet designed — promote one to a full epic (like Suricata above) onl
 ## Epoch 5 — Host Defense (fail2ban)
 Goal: extend defense-in-depth to the host itself — react to suspicious local activity (repeated failed logins, etc.), complementing Suricata's network-level detection with host-level response.
 
+**Status: deferred, not built.** Checked the first item below — this host has no real target (`sshd` inactive/disabled, no other auth-facing service running). Consistent with "add tools only when you have a concrete need." Revisit if that ever changes (e.g. SSH gets deliberately enabled).
+
 ### Epic: Host Intrusion Prevention (fail2ban)
-- [ ] **Confirm there's an actual target before building around one**: identify which auth-facing services (SSH, etc.) are actually running/exposed on this host. `fail2ban` watches logs from services facing login attempts — no exposed service means nothing meaningful for it to protect.
+- [x] **Confirm there's an actual target before building around one**: identify which auth-facing services (SSH, etc.) are actually running/exposed on this host. `fail2ban` watches logs from services facing login attempts — no exposed service means nothing meaningful for it to protect.
+  - Checked: `sshd` inactive + disabled. No FTP/VNC/Samba/Cockpit/web-admin running either. Only listeners are localhost-only (VS Code), DNS resolution, LLMNR, and KDE Connect (pairing-based auth, not a fail2ban fit). **No target — epic deferred**, remaining items below not started.
 - [ ] Decide: separate image in `defense/fail2ban/`, same per-tool-family subdirectory pattern as `scan-tools/` and `defense/suricata/`
 - [ ] **Test empirically, don't assume**: can a containerized `fail2ban` actually write firewall rules that take effect against the host (`--network host` + capabilities)? This is the load-bearing assumption for the whole epic — validate it early, the same way the Suricata capability requirement was confirmed by testing before/after `--cap-add`, not assumed from docs.
 - [ ] Configure `fail2ban` to watch the confirmed real log source(s) from the item above
 - [ ] Decide how to view what's been banned (parallel to Suricata's `logs` subcommand)
 - [ ] Wrapper script (start/stop/status, extending the same `case`-statement pattern from `suricata-ctl.sh`)
+
+---
+
+## Epoch 6 — Certificate & TLS Auditing (testssl.sh)
+Goal: close the loop on the very first real finding this project ever produced — `quick-recon.sh`'s first-ever test run caught an expired, generic SSL cert on this network's own router admin panel. This epic turns that one-off catch into a systematic, repeatable audit tool for exactly that class of problem (expired/weak certs, deprecated protocols, weak ciphers, known TLS vulnerabilities).
+
+### Epic: TLS/SSL Configuration Auditing
+- [ ] **Decide: fold into the existing `scan-tools/` image, or a new subdirectory?** Unlike Suricata/`fail2ban`, this tool has no different container lifecycle — it's a one-shot, single-target audit, architecturally identical in shape to `quick-recon.sh`. The "own subdirectory" pattern was justified by genuinely different *kinds* of tools (daemon vs. one-shot), not just topical difference — worth deciding on purpose rather than defaulting to "new subdirectory" out of habit.
+- [ ] **Confirm capability requirements empirically, don't assume**: `testssl.sh` is a standard TLS client (like a browser making an HTTPS connection), not raw-socket/packet-capture tooling — it likely does *not* need `--cap-add=NET_RAW`/`NET_ADMIN` the way the rest of `scan-tools` does. Test this directly rather than copy-pasting the capability flags out of habit.
+- [ ] Decide accepted target format(s) — `testssl.sh` supports plain hostname:port, full URLs, and other shapes; pick what this script actually exposes
+- [ ] Check whether `testssl.sh` has a native "write results to file" flag (it does support several: JSON/CSV/log-file output) — if so, use that directly, matching the `nmap -oN` pattern, rather than the `arp-scan`-style shell-redirect wrapper needed when a tool has no native output flag
+- [ ] Same conventions as every other `scan-tools` script: `--help`, required target (no sensible default for a single host, same reasoning as `quick-recon.sh`), timestamped output into `~/kali-data`
+- [ ] Add the new script to `ci.yml`'s `shellcheck` glob — don't repeat the CI-coverage gap that had to be caught and fixed for Suricata
+- [ ] Test against the real, already-known target: this network's router admin panel (`192.168.1.254`) — the same cert that started this whole thread
 
 ---
 
@@ -150,3 +167,4 @@ Goal: extend defense-in-depth to the host itself — react to suspicious local a
 | Epoch 3 — Maturity | CI building the image on every push, polished README, first tagged release (`v0.1`) |
 | Epoch 4 — Defense Layer | Suricata running as a long-lived container, watching live traffic, alerts viewable via a wrapper script |
 | Epoch 5 — Host Defense | `fail2ban` confirmed to actually ban IPs from a container against a real, confirmed log source; wrapper script parallel to `suricata-ctl.sh` |
+| Epoch 6 — Certificate & TLS Auditing | `testssl.sh` script tested against the router's real admin panel, correctly re-catching the expired-cert finding from this project's first-ever scan |
