@@ -19,8 +19,9 @@ A Kali-based Docker image (`scan-tools/`) with:
 - [`arp-scan`](https://github.com/royhills/arp-scan) — ARP-based local network discovery
 - [`netdiscover`](https://github.com/netdiscover-scanner/netdiscover) — passive/active ARP reconnaissance
 - [`tshark`](https://www.wireshark.org/docs/man-pages/tshark.html) — packet capture (Wireshark's CLI)
+- [`testssl.sh`](https://testssl.sh/) — TLS/SSL configuration auditing (protocols, ciphers, certificate validity, known vulnerabilities)
 
-...wrapped in four scripts (`scan-tools/scripts/`) that handle the Docker invocation, output persistence, and safe defaults for you.
+...wrapped in scripts (`scan-tools/scripts/`) that handle the Docker invocation, output persistence, and safe defaults for you.
 
 ## Prerequisites
 
@@ -84,6 +85,24 @@ Uses `arp-scan` directly instead of `nmap` — more reliable on a local segment 
 ```
 192.168.1.1     aa:bb:cc:dd:ee:ff    Some Router Vendor
 192.168.1.42    11:22:33:44:55:66    Some Device Vendor
+```
+
+### `testssl.sh` — TLS/SSL configuration audit
+
+Runs `testssl` against a single target, checking protocol versions, cipher strength, certificate validity, and known TLS vulnerabilities (Heartbleed, POODLE, etc.). Unlike the other scripts, this one doesn't need `--cap-add=NET_RAW`/`NET_ADMIN` — it's a standard TLS client, not raw-socket tooling.
+
+```bash
+./scan-tools/scripts/testssl.sh 192.168.1.1
+```
+Target is required — there's no sensible default for a single host.
+
+```
+Certificate Validity (UTC)   expired (2015-06-01 --> 2025-05-29)
+Chain of trust               NOT ok (self signed)
+Trust (hostname)             certificate does not match supplied URI
+TLS 1.2                      offered (OK)
+TLS 1.3                      offered (OK): final
+Overall Grade                T
 ```
 
 ### `clean-up.sh` — wipe saved scan data
