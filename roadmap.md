@@ -84,7 +84,8 @@ Different goal from the Lynis/rkhunter idea it grew out of — not auditing the 
 
 ### Epic: Nice-to-Haves / Backlog
 Opportunistic — pull items into scope only when there's a concrete need, not on a schedule.
-- [ ] Add optional tools as needed: `masscan`, `nikto`, `hydra` (only if you have a real use case — avoid bloat)
+- [ ] Add optional tools as needed: `masscan`, `hydra` (only if you have a real use case — avoid bloat)
+  - `nikto` promoted out of this list into its own epic — see Epoch 7
 - [ ] Simple HTML/Markdown report generator from scan output
 - [ ] Scheduled scan option (cron inside container or host-level cron calling `docker run`)
 - [ ] Shodan/VirusTotal API integration for external recon (own domains only) — secrets via `.env`, never committed
@@ -151,6 +152,76 @@ Goal: close the loop on the very first real finding this project ever produced �
 
 ---
 
+## Epoch 7 — Web Application Misconfiguration Scanning (nikto)
+Goal: extend recon from network/TLS-layer auditing into the web application layer itself — the router's admin panel (`lighttpd`, already the project's proven real target) is a live HTTP(S) service that's never actually been checked for server misconfigurations, dangerous default files, or outdated software banners. Pulled out of Epoch 3's Nice-to-Haves backlog into its own epic, same pattern as Trivy and `testssl.sh` before it.
+
+### Epic: Web Server Misconfiguration Scanning
+- [ ] **Decide: fold into the existing `scan-tools/` image, or a new subdirectory?** Same reasoning to apply as `testssl.sh` — `nikto` is a one-shot, single-target CLI scan, not a daemon, so precedent points toward folding in rather than defaulting to a new subdirectory. Confirm on purpose rather than assume.
+- [ ] Confirm the package name/install path for `nikto` in Kali's apt repos and add it to `scan-tools/Dockerfile`
+- [ ] **Confirm capability requirements empirically, don't assume**: like `testssl.sh`, `nikto` is an HTTP(S) client making normal requests, not raw-socket tooling — likely needs no `--cap-add=NET_RAW`/`NET_ADMIN`, but test directly rather than copy-pasting the flags out of habit.
+- [ ] Decide accepted target format(s) — `nikto` conventionally takes `-h <host>` (and `-ssl` for HTTPS, `-p <port>` if non-default); decide what this script exposes to the caller vs. hardcodes
+- [ ] Check whether `nikto` has a native "write results to file" flag (it does: `-o <file>` with `-Format txt/html/xml/csv/...`) — use that directly rather than a shell-redirect wrapper, matching the `-oL`/`-oN` pattern from every prior script
+- [ ] Same conventions as every other `scan-tools` script: `--help`, required target (no sensible default for a single host), timestamped output into `~/kali-data`
+- [ ] Add the new script to `ci.yml`'s `shellcheck` glob — check first whether the existing glob (`scan-tools/scripts/*.sh`) already covers it before assuming a change is needed (it did for `testssl.sh`)
+- [ ] Test against the real, already-known target: the router admin panel (`192.168.1.254`, `lighttpd`) — same target that's produced every real finding so far in this project
+
+---
+
+## Epoch 8 — Traffic Visibility (Suricata Custom Rules)
+Goal: extend the existing Suricata deployment (Epoch 4) with rules tuned to
+this network specifically, closing the gap between "generic community
+ruleset" and "actually watching for signs of unauthorized/unexpected
+outbound data transfer." Reuses the running daemon and `eve.json` pipeline
+rather than introducing new capture tooling — `tshark` (installed in
+Epoch 1, never used) was considered and deliberately not pursued for this;
+see decision note below.
+
+### Epic: Custom Detection Rules
+- [ ] **Confirm a concrete signal before writing rules** (same discipline as
+  Epoch 5/fail2ban): baseline what "normal" outbound traffic looks like on
+  this network — known devices, known destinations/ports — so a custom rule
+  has something real to flag as anomalous, not a guess.
+- [ ] Decide which anomaly class(es) to start with — pick 1-2, not all at
+  once: unexpected/new destination IP, unusually large single-flow data
+  volume, unusual protocol-port combination, or DNS-based exfiltration
+  patterns (long/high-entropy queries).
+- [ ] Decide where custom rules live: a `local.rules` file loaded alongside
+  the ET Open ruleset (standard Suricata convention) vs. tuning
+  `suricata.yaml` flow/threshold settings directly.
+- [ ] Decide how custom rules ship: baked into the image at build time
+  (same reproducibility tradeoff as the pinned ET ruleset) vs. mounted at
+  runtime for faster iteration without a rebuild.
+- [ ] Confirm alerting/visibility: do custom-rule hits show up via the
+  existing `suricata-ctl.sh logs` filter (`event_type == "alert"`)
+  automatically, or do they need a distinct tag/classification to
+  distinguish a custom exfiltration-rule hit from a generic ET rule hit?
+- [ ] **Test empirically against real traffic** — deliberately generate a
+  test case (e.g. a large outbound transfer, or a connection to a
+  not-normally-contacted destination) and confirm the custom rule actually
+  fires, same empirical bar used for every capability requirement so far
+  in this project.
+
+**Decision note**: considered a `tshark`-based sniffer script instead
+(reusing the tool installed but unused since Epoch 1). Deferred in favor of
+Suricata custom rules — Suricata is already running continuously and
+already parses flow data; a separate sniffer would duplicate that
+capability rather than extend it. Revisit only if a concrete need for raw
+packet capture (not classification) shows up, e.g. an alert needing deeper
+manual pcap inspection to confirm.
+
+### Epic: Correlation / Query Layer (Backlog — not scoped in detail)
+Deferred pending Epoch 8 producing real alert data to correlate against.
+The idea: a common, queryable store joining Suricata alerts with
+nmap/testssl/trivy scan history (e.g. "did this alert's source IP show up
+in a recent scan"). No existing tooling in the repo does this today — it
+would be new infrastructure (something as light as a `jq`/SQLite script,
+or heavier like Loki+Grafana), not an extension of an existing pattern.
+Scope as its own epic once Epoch 8 has run for real and there's actual data
+worth correlating — same "confirm real need before building" rule applied
+to fail2ban and auditd.
+
+---
+
 ## Guiding Principles Throughout
 - **Reproducible over convenient** — prefer Dockerfile changes over manual `apt install` inside a running container.
 - **Data stays out of git** — scan results, pcaps, and logs live in a gitignored volume, not the repo.
@@ -168,3 +239,5 @@ Goal: close the loop on the very first real finding this project ever produced �
 | Epoch 4 — Defense Layer | Suricata running as a long-lived container, watching live traffic, alerts viewable via a wrapper script |
 | Epoch 5 — Host Defense | `fail2ban` confirmed to actually ban IPs from a container against a real, confirmed log source; wrapper script parallel to `suricata-ctl.sh` |
 | Epoch 6 — Certificate & TLS Auditing | `testssl.sh` script tested against the router's real admin panel, correctly re-catching the expired-cert finding from this project's first-ever scan |
+| Epoch 7 — Web Application Misconfiguration Scanning | `nikto` script tested against the router's real admin panel, capability requirements confirmed empirically |
+| Epoch 8 — Traffic Visibility | Custom Suricata rule(s) tested against real generated traffic, confirmed to fire on the target anomaly class chosen |
