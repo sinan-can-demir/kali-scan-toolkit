@@ -167,6 +167,61 @@ Goal: extend recon from network/TLS-layer auditing into the web application laye
 
 ---
 
+## Epoch 8 — Traffic Visibility (Suricata Custom Rules)
+Goal: extend the existing Suricata deployment (Epoch 4) with rules tuned to
+this network specifically, closing the gap between "generic community
+ruleset" and "actually watching for signs of unauthorized/unexpected
+outbound data transfer." Reuses the running daemon and `eve.json` pipeline
+rather than introducing new capture tooling — `tshark` (installed in
+Epoch 1, never used) was considered and deliberately not pursued for this;
+see decision note below.
+
+### Epic: Custom Detection Rules
+- [ ] **Confirm a concrete signal before writing rules** (same discipline as
+  Epoch 5/fail2ban): baseline what "normal" outbound traffic looks like on
+  this network — known devices, known destinations/ports — so a custom rule
+  has something real to flag as anomalous, not a guess.
+- [ ] Decide which anomaly class(es) to start with — pick 1-2, not all at
+  once: unexpected/new destination IP, unusually large single-flow data
+  volume, unusual protocol-port combination, or DNS-based exfiltration
+  patterns (long/high-entropy queries).
+- [ ] Decide where custom rules live: a `local.rules` file loaded alongside
+  the ET Open ruleset (standard Suricata convention) vs. tuning
+  `suricata.yaml` flow/threshold settings directly.
+- [ ] Decide how custom rules ship: baked into the image at build time
+  (same reproducibility tradeoff as the pinned ET ruleset) vs. mounted at
+  runtime for faster iteration without a rebuild.
+- [ ] Confirm alerting/visibility: do custom-rule hits show up via the
+  existing `suricata-ctl.sh logs` filter (`event_type == "alert"`)
+  automatically, or do they need a distinct tag/classification to
+  distinguish a custom exfiltration-rule hit from a generic ET rule hit?
+- [ ] **Test empirically against real traffic** — deliberately generate a
+  test case (e.g. a large outbound transfer, or a connection to a
+  not-normally-contacted destination) and confirm the custom rule actually
+  fires, same empirical bar used for every capability requirement so far
+  in this project.
+
+**Decision note**: considered a `tshark`-based sniffer script instead
+(reusing the tool installed but unused since Epoch 1). Deferred in favor of
+Suricata custom rules — Suricata is already running continuously and
+already parses flow data; a separate sniffer would duplicate that
+capability rather than extend it. Revisit only if a concrete need for raw
+packet capture (not classification) shows up, e.g. an alert needing deeper
+manual pcap inspection to confirm.
+
+### Epic: Correlation / Query Layer (Backlog — not scoped in detail)
+Deferred pending Epoch 8 producing real alert data to correlate against.
+The idea: a common, queryable store joining Suricata alerts with
+nmap/testssl/trivy scan history (e.g. "did this alert's source IP show up
+in a recent scan"). No existing tooling in the repo does this today — it
+would be new infrastructure (something as light as a `jq`/SQLite script,
+or heavier like Loki+Grafana), not an extension of an existing pattern.
+Scope as its own epic once Epoch 8 has run for real and there's actual data
+worth correlating — same "confirm real need before building" rule applied
+to fail2ban and auditd.
+
+---
+
 ## Guiding Principles Throughout
 - **Reproducible over convenient** — prefer Dockerfile changes over manual `apt install` inside a running container.
 - **Data stays out of git** — scan results, pcaps, and logs live in a gitignored volume, not the repo.
@@ -185,3 +240,4 @@ Goal: extend recon from network/TLS-layer auditing into the web application laye
 | Epoch 5 — Host Defense | `fail2ban` confirmed to actually ban IPs from a container against a real, confirmed log source; wrapper script parallel to `suricata-ctl.sh` |
 | Epoch 6 — Certificate & TLS Auditing | `testssl.sh` script tested against the router's real admin panel, correctly re-catching the expired-cert finding from this project's first-ever scan |
 | Epoch 7 — Web Application Misconfiguration Scanning | `nikto` script tested against the router's real admin panel, capability requirements confirmed empirically |
+| Epoch 8 — Traffic Visibility | Custom Suricata rule(s) tested against real generated traffic, confirmed to fire on the target anomaly class chosen |
