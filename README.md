@@ -20,6 +20,7 @@ A Kali-based Docker image (`scan-tools/`) with:
 - [`netdiscover`](https://github.com/netdiscover-scanner/netdiscover) — passive/active ARP reconnaissance
 - [`tshark`](https://www.wireshark.org/docs/man-pages/tshark.html) — packet capture (Wireshark's CLI)
 - [`testssl.sh`](https://testssl.sh/) — TLS/SSL configuration auditing (protocols, ciphers, certificate validity, known vulnerabilities)
+- [`nikto`](https://github.com/sullo/nikto) — web server misconfiguration scanning (missing security headers, insecure cookies, outdated banners)
 
 ...wrapped in scripts (`scan-tools/scripts/`) that handle the Docker invocation, output persistence, and safe defaults for you.
 
@@ -103,6 +104,22 @@ Trust (hostname)             certificate does not match supplied URI
 TLS 1.2                      offered (OK)
 TLS 1.3                      offered (OK): final
 Overall Grade                T
+```
+
+### `nikto.sh` — web server misconfiguration scan
+
+Runs `nikto` against a single HTTP(S) target, checking for missing security headers, insecure cookie flags, outdated server banners, and other common web misconfigurations. Like `testssl.sh`, this one needs neither `--cap-add=NET_RAW`/`NET_ADMIN` nor `--network host` — it's a standard HTTP client, and outbound requests work fine through Docker's default bridge network.
+
+```bash
+./scan-tools/scripts/nikto.sh https://192.168.1.1
+```
+Target is required and accepts a full URL (scheme included) — nikto parses `http://`/`https://` directly.
+
+```
++ Cookie SessionID created without the secure flag.
++ Suggested security header missing: content-security-policy.
++ Suggested security header missing: referrer-policy.
++ The X-Content-Type-Options header is not set.
 ```
 
 ### `clean-up.sh` — wipe saved scan data
