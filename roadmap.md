@@ -177,10 +177,44 @@ Epoch 1, never used) was considered and deliberately not pursued for this;
 see decision note below.
 
 ### Epic: Custom Detection Rules
-- [ ] **Confirm a concrete signal before writing rules** (same discipline as
+- [x] **Confirm a concrete signal before writing rules** (same discipline as
   Epoch 5/fail2ban): baseline what "normal" outbound traffic looks like on
   this network — known devices, known destinations/ports — so a custom rule
   has something real to flag as anomalous, not a guess.
+  - Baseline captured 2026-08-17/18: Suricata run for ~5 hours, 9584 `flow`
+    events collected. Query used: `jq -r 'select(.event_type=="flow") |
+    "\(.dest_ip):\(.dest_port)/\(.proto)"' eve.json | sort | uniq -c | sort
+    -rn` — ranks destination:port/proto combos by frequency, high-frequency
+    entries are the baseline "normal," rare/one-off entries are candidates
+    worth investigating.
+  - Routine/expected traffic identified: DNS to the router (`192.168.1.254:53`,
+    by far the highest volume), mDNS/SSDP local-discovery multicast traffic,
+    IPv6 Neighbor Discovery (`ff02::.../IPv6-ICMP`, one entry per device due
+    to IPv6 privacy-address rotation, same root cause as the `.96`
+    MAC-randomization finding from Epoch 7), and background `443/TCP`
+    and `443/UDP` (QUIC) traffic to Microsoft/Google cloud ranges (Windows/
+    Android/Chrome telemetry and sync).
+  - Two anomalies investigated and resolved, not left unexplained:
+    1. `192.168.1.255:15600/UDP` (1489 hits, ~5/min sustained) — traced via
+       `src_ip` to `192.168.1.67`, cross-referenced against `arp-sweep.sh`'s
+       earlier output showing that MAC as Samsung-vendor. Benign: a Samsung
+       device's proprietary discovery/casting broadcast, same category as
+       SSDP just vendor-specific.
+    2. `169.254.169.254:80/TCP` (80 hits, exactly every ~15 min in pairs 2 min
+       apart) — traced via `src_ip` to the host itself (`192.168.1.95`), ruled
+       out systemd timers (`systemctl list-timers` / `--user`, neither showed
+       a 15-min job), then traced to a specific Docker container: `ims_minio`
+       (MinIO, a separate/unrelated project on this same Docker host, network
+       `ims-manual_default` — not `--network host`, so its NAT'd traffic looks
+       identical to host traffic in Suricata's log). Benign: well-documented
+       MinIO behavior — its S3/IAM-compatible credential chain checks the
+       cloud Instance Metadata Service on a fixed interval even when
+       self-hosted, and since `169.254.169.254` is link-local/unroutable on
+       this network, the checks just fail silently rather than reach anything.
+    - **Worth remembering going forward**: a "host" in a network baseline
+      isn't always a physical device — it can be a container on the same
+      Docker host, NAT'd through the same IP, indistinguishable from host
+      traffic without checking `docker ps`/`docker inspect` directly.
 - [ ] Decide which anomaly class(es) to start with — pick 1-2, not all at
   once: unexpected/new destination IP, unusually large single-flow data
   volume, unusual protocol-port combination, or DNS-based exfiltration
